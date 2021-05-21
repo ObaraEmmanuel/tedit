@@ -1,4 +1,10 @@
 import tkinter as tk
+from tkinter.font import Font
+from pygments import highlight
+from pygments.lexers import get_lexer_by_name
+from pygments.lexer import Lexer
+
+from tedit.formatter import TextFormatter
 
 
 class TextArea(tk.Text):
@@ -15,13 +21,37 @@ class TextArea(tk.Text):
         self.bind("<<Modified>>", self._on_change)
         self.bind("<Control-z>", lambda _: self.edit_undo())
         self.bind("<Control-y>", lambda _: self.edit_redo())
+        self._lexer = get_lexer_by_name("python")
+        self._formatter = TextFormatter(self, style="default")
+        self._highlight_enabled = True
+
+    def config_highlight(self, **options):
+        if options.get("lexer") is not None:
+            if isinstance(options['lexer'], Lexer):
+                self._lexer = options['lexer']
+            else:
+                self._lexer = get_lexer_by_name(options['lexer'])
+
+        if options.get("style") is not None:
+            self._formatter = TextFormatter(self, style=options["style"])
+
+        if options.get("tab"):
+            tab_size = Font(font=self["font"]).measure(" "*options["tab"])
+            self.configure(tabs=tab_size)
+
+        self._highlight_enabled = options.get("highlight", True)
 
     def _on_change(self, *_):
         flag = self.edit_modified()
         # skip possible implicit modifications
         if flag:
             self.event_generate("<<TextChange>>")
+            self._format()
         self.edit_modified(False)
+
+    def _format(self):
+        if self._highlight_enabled:
+            highlight(self.get_all(), self._lexer, self._formatter)
 
     def get_all(self):
         return self.get("1.0", tk.END)
